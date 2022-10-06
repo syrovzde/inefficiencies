@@ -149,6 +149,8 @@ def load_asian_odds(engine,MatchID,market,timestamp):
     if market == 'ah':
         odds = pd.read_sql(sql_ah.format(matchid=MatchID, timestamp=timestamp), engine)
         odds = hlp.parse_handicap(odds).reset_index(drop=True)
+        print(odds)
+
         return odds
     if market == '1x2':
         odds=pd.read_sql(sql_x.format(matchid=MatchID), engine)

@@ -25,4 +25,4 @@ def indices_threshhold(p=0.97,probabilities=None,points=10):
         if cur_value <= p:
             reached_threshold = True
     rows,columns=transform_index_to_2D(indexes=indices[:(points+1)**2-cur_index])
-    return rows,columns,indices[:cur_index]
+    return rows,columns,indices[(points+1)**2-cur_index:],probabilities

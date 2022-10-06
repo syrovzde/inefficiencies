@@ -1,8 +1,10 @@
+import copy
+
 import gurobipy as gp
 import numpy as np
 import pandas as pd
 from gurobipy import GRB
-import copy
+
 from utils import helper_functions as hlp
 from utils import utils
 
@@ -195,7 +197,7 @@ class Arbitrage:
         else:
             columns = hlp.market_tables(market=market, points=self.points)
             match_rows = odds
-        return columns,match_rows
+        return columns, match_rows
 
     def bookmaker_filter(self, odds, bookmaker, market):
         if market == 'ou':
@@ -231,25 +233,29 @@ class Arbitrage:
             a = float(match_row[market_column])
             pass
         except:
-            print('')
-        column[column == 1] = float(match_row[int(market_column)]) - 1
+            pass
         column[column == 0] = - 1
+        column[column == 1] = float(match_row[int(market_column)]) - 1
+        column[column == -0.1] = 0
         return column
 
-    def solve_maxprofit_gurobi(self, matrixes_dict, MatchID, verbose=False, save2db=False):
-        for timestamp in matrixes_dict:
-            matrix_A = matrixes_dict[timestamp][0]
-            model, A, x, y = self.create_model(matrix_A, verbose)
-            model.update()
+    def solve_maxprofit_gurobi(self, matrix_A, MatchID, verbose=False, save2db=False):
+        # for timestamp in matrixes_dict:
+        # matrix_A = matrixes_dict[timestamp][0]
+        model, A, x, y = self.create_model(matrix_A, verbose)
+        model.update()
+        model.optimize()
+        if model.status == GRB.INF_OR_UNBD:
+            # Turn presolve off to determine whether model is infeasible
+            # or unbounded
+            model.setParam(GRB.Param.Presolve, 0)
             model.optimize()
-            if model.status == GRB.INF_OR_UNBD:
-                # Turn presolve off to determine whether model is infeasible
-                # or unbounded
-                model.setParam(GRB.Param.Presolve, 0)
-                model.optimize()
-            if verbose: self.print_stats(model, A, x, y, matrix_A, timestamp)
-            if save2db:
-                self.save_modelinfo(model, matrix_A, MatchID, x, y, timestamp, matrixes_dict[timestamp][1])
+        if verbose: self.print_stats(model, A, x, y, matrix_A, None)
+        if model.status == GRB.OPTIMAL:
+            return True,x.x
+        return False,None
+       #if save2db:
+       #     self.save_modelinfo(model, matrix_A, MatchID, x, y, timestamp, matrixes_dict[timestamp][1])
 
     def create_model(self, matrix_A, verbose):
         try:
@@ -258,7 +264,6 @@ class Arbitrage:
             A = matrix_A
         N = A.shape[1]
         A = np.hstack((A, -np.ones((A.shape[0], 1))))
-        print(A.shape)
         model = gp.Model('LP')
         x = model.addMVar(shape=N + 1, vtype=GRB.CONTINUOUS, name="x")
         y = model.addMVar(shape=N, vtype=GRB.BINARY, name="y")
@@ -272,17 +277,18 @@ class Arbitrage:
 
     def print_stats(self, model, A, x, y, matrix_A, timestamp):
         if model.status == GRB.OPTIMAL:
-            print('Success', ' Status:', model.status)
-            print('Timestamp: ', timestamp)
-            print('Profit (%): ', x.x[-1] / sum(x.x[:-1]))
-            print('Multiplication result min: ', min(A[:, :-1] @ x.x[:-1]))
-            print('Optimal objective: %g' % model.objVal)
-
-            active_cols = ['PosState']
-            for i in range(y.shape[0]):
-                if y[i].x == 1:
-                    active_cols.append(matrix_A.columns[i + 1])
-            print(matrix_A.loc[:, active_cols])
+            #print('Success', ' Status:', model.status)
+            #print('Timestamp: ', timestamp)
+            #print('Profit (%): ', x.x[-1] / sum(x.x[:-1]))
+            print(x.x)
+            #print(matrix_A)
+            #print('Multiplication result min: ', min(A[:, :-1] @ x.x[:-1]))
+            #print('Optimal objective: %g' % model.objVal)
+            #active_cols = ['PosState']
+            #for i in range(y.shape[0]):
+            #    if y[i].x == 1:
+            #        active_cols.append(matrix_A.columns[i + 1])
+            #print(matrix_A.loc[:, active_cols])
 
         elif model.status != GRB.INFEASIBLE:
             print('Optimization was stopped with status %d' % model.status)

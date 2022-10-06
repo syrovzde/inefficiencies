@@ -56,16 +56,22 @@ def bts_market_table(points=11):
 def ou_result_table(totals, points=11):
     count = totals.size
     cums_array = np.ones((points, points))
-    table = np.ones((count, points, points), dtype=np.float)
+    table = np.ones((count, points, points), dtype=np.bool)
+    equal_table = np.zeros((count, points, points), dtype=np.bool)
     over = np.zeros((count, points ** 2), dtype=np.float)
     under = np.zeros((count, points ** 2), dtype=np.float)
+    all_over = np.zeros((points,points), dtype=np.float)
+    all_under = np.zeros((points,points), dtype=np.float)
     for i in range(0, points):
         cums_array[i, :] = np.arange(i, points + i)
     for i in range(count):
-        table[i, :, :] = cums_array > totals[i]
+        table[i] = cums_array > totals[i]
+        equal_table[i] = cums_array == totals[i]
     for i in range(count):
-        all_over = table[i, :] == 1
-        all_under = table[i, :] == 0
+        all_over[table[i]] = 1
+        all_over[equal_table[i]] = -0.1
+        all_under[table[i]] = 0
+        all_under[equal_table[i]] = -0.1
         over[i] = all_over.flatten()
         under[i] = all_under.flatten()
     return under.T, over.T
@@ -75,8 +81,8 @@ def ou_result_table(totals, points=11):
 def ah_result_table(handicap, points=11):
     count = np.size(handicap)
     cums_array = np.ones((points, points))
-    table_one = np.zeros((count, points * points), dtype=np.float)
-    table_two = np.zeros((count, points * points), dtype=np.float)
+    table_one = np.zeros((count, points * points), dtype=np.int)
+    table_two = np.zeros((count, points * points), dtype=np.int)
     table = np.zeros((count, points, points))
     for i in range(0, points):
         cums_array[i, :] = np.arange(-i, points - i)
