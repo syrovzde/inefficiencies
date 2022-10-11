@@ -20,11 +20,11 @@ sql_x = """ SELECT \"1\",\"2\",\"x\",\"Timestamp\" FROM asianodds.\"Odds_1x2_FT\
 """
 
 sql_ou = """SELECT 
-\"Over\",\"1\",\"2\" FROM asianodds.\"Odds_ou_FT\" WHERE \"Odds_ou_FT\".\"MatchID\" = \'{matchid}\' AND
+\"Over\",\"1\" as \"0\",\"2\" as \"1\" FROM asianodds.\"Odds_ou_FT\" WHERE \"Odds_ou_FT\".\"MatchID\" = \'{matchid}\' AND
 \"Odds_ou_FT\".\"Timestamp\" = \'{timestamp}\'
 """
 sql_ah = """ SELECT 
-\"Handicap\","1",\"2\"FROM asianodds.\"Odds_ah_FT\" WHERE \"Odds_ah_FT\".\"MatchID\" = \'{matchid}\' AND
+\"Handicap\",\"1\" as \"0\" ,\"2\" as \"1\" FROM asianodds.\"Odds_ah_FT\" WHERE \"Odds_ah_FT\".\"MatchID\" = \'{matchid}\' AND
 \"Odds_ah_FT\".\"Timestamp\" = \'{timestamp}\'
 """
 
@@ -149,8 +149,6 @@ def load_asian_odds(engine,MatchID,market,timestamp):
     if market == 'ah':
         odds = pd.read_sql(sql_ah.format(matchid=MatchID, timestamp=timestamp), engine)
         odds = hlp.parse_handicap(odds).reset_index(drop=True)
-        print(odds)
-
         return odds
     if market == '1x2':
         odds=pd.read_sql(sql_x.format(matchid=MatchID), engine)

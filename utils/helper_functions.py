@@ -54,20 +54,21 @@ def bts_market_table(points=11):
 
 
 def ou_result_table(totals, points=11):
-    count = totals.size
+    count = len(totals)
     cums_array = np.ones((points, points))
     table = np.ones((count, points, points), dtype=np.bool)
     equal_table = np.zeros((count, points, points), dtype=np.bool)
     over = np.zeros((count, points ** 2), dtype=np.float)
     under = np.zeros((count, points ** 2), dtype=np.float)
-    all_over = np.zeros((points,points), dtype=np.float)
-    all_under = np.zeros((points,points), dtype=np.float)
+
     for i in range(0, points):
         cums_array[i, :] = np.arange(i, points + i)
     for i in range(count):
         table[i] = cums_array > totals[i]
         equal_table[i] = cums_array == totals[i]
     for i in range(count):
+        all_over = np.zeros((points, points), dtype=np.float)
+        all_under = np.ones((points, points), dtype=np.float)
         all_over[table[i]] = 1
         all_over[equal_table[i]] = -0.1
         all_under[table[i]] = 0
@@ -81,8 +82,8 @@ def ou_result_table(totals, points=11):
 def ah_result_table(handicap, points=11):
     count = np.size(handicap)
     cums_array = np.ones((points, points))
-    table_one = np.zeros((count, points * points), dtype=np.int)
-    table_two = np.zeros((count, points * points), dtype=np.int)
+    table_one = np.zeros((count, points * points))
+    table_two = np.zeros((count, points * points))
     table = np.zeros((count, points, points))
     for i in range(0, points):
         cums_array[i, :] = np.arange(-i, points - i)
@@ -352,8 +353,11 @@ def find_correct_odds(fair, margin, generating):
 
 if __name__ == '__main__':
     # results = ['1-1', '1-3', '2-2', '3-2']
-    results = ['0-0', '1-0', '0-1', '1-1', '2-1', '1-2', '2-2']
-    totals = ['0', '0, 0.5', '-1', '0.5', '1']
+    #results = ['0-0', '1-0', '0-1', '1-1', '2-1', '1-2', '2-2']
+    #totals = ['0', '0, 0.5', '-1', '0.5', '1']
+    handicap = [2.5]
+    under,over = ou_result_table(handicap,4)
+    print(under)
     # over = [2,3,5,1.5,1.2]
     # under = [1.8,1.5,1.2,2.3,8]
     # print(len(over))
@@ -369,6 +373,6 @@ if __name__ == '__main__':
     # over, under = ou_result_table(totals=totals, points=10)
     # print(over)
     # print(under.shape)
-    results = pd.Series(results)
+    #results = pd.Series(results)
     # print(asian_handicap_results(results, None, from_string=True))
-    print(ah_result_table(pd.Series([1.5]), 10)[0])
+    #print(ah_result_table(pd.Series([1.5]), 10)[0])

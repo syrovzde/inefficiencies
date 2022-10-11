@@ -233,9 +233,9 @@ class Arbitrage:
             a = float(match_row[market_column])
             pass
         except:
-            pass
+            a = float(match_row[int(market_column)])
         column[column == 0] = - 1
-        column[column == 1] = float(match_row[int(market_column)]) - 1
+        column[column == 1] = a - 1
         column[column == -0.1] = 0
         return column
 
