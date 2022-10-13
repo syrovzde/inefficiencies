@@ -8,8 +8,8 @@ from utils import utils as ut
 
 csv_file_with_mapping = "bet_AsianOdds_AO2BE.csv"
 ip = "147.32.83.171"
-sql_ou = """
-SELECT DISTINCT \"Home\",\"Away\" FROM asianodds.\"Matches\" where \"Home\"=\'{y}\'
+sql_matches = """
+SELECT DISTINCT \"Home\",\"Away\" FROM asianodds.\"Matches\" where \"Home\"=\'{h}\' and \"Away\"=\'{a}\'
 """
 
 ssh_tunnel = SSHTunnelForwarder(
@@ -27,12 +27,22 @@ engine = create_engine("postgresql://{user}@{host}:{port}/{db}".format(
     db='asianodds'
 ))
 
+def change_date(AO_date:str):
+    parsed = AO_date.split('-')
+    year = int(parsed[0])
+    month = int(parsed[1])
+    day = int(parsed[2].split(' ')[0])
+    return '{d}.{m}. {y}'.format(d=day,m=month,y=year)
 
-def translate(ao_name='CA Banfield',engine=None,translate_table=None):
+
+def translate(ao_name_home='CA Banfield',ao_name_away='CA Banfield',engine=None,translate_table=None):
     if translate_table is None:
         translate_table =pd.read_csv(csv_file_with_mapping)
-    l=pd.read_sql(sql=sql_ou.format(y=ao_name),con=engine)
-    ar=l['Home'].to_numpy()
-    print(translate_table['BE'].loc[translate_table['AO'] == ar[0]].values)
-
-translate(engine=engine)
+    #l=pd.read_sql(sql=sql_matches.format(h=ao_name_home,a=ao_name_away), con=engine)
+    translate_home = translate_table['BE'].loc[translate_table['AO'] == ao_name_home].to_numpy()
+    if translate_home.size > 0:
+        translate_home = translate_home[-1]
+    translate_away = translate_table['BE'].loc[translate_table['AO'] == ao_name_away].to_numpy()
+    if translate_away.size > 0:
+        translate_away = translate_away[-1]
+    return translate_home,translate_away

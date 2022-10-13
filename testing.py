@@ -5,6 +5,8 @@ from sshtunnel import SSHTunnelForwarder
 import arbitrage
 from threshhold_calculator import indices_threshhold
 from utils import utils as ut
+import numpy as np
+import maping
 
 schemas = ['asianodds']
 markets = ['1x2', 'ou', 'ah']
@@ -14,9 +16,12 @@ markets_cols = {'1x2': ['home', 'away', 'draw'], 'bts': ['NO', 'YES'], 'ou': ['U
                 'dc': ['homedraw', 'homeaway', 'awaydraw']}
 
 sql_all_matches = """
-SELECT \"MatchID\",\"Time\",\"Home\",\"Away\" FROM asianodds.\"Matches\"
+SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\"
 """
 
+sql_results = """
+SELECT DISTINCT \"Result\" FROM football.\"Matches\" WHERE \"Home\" = \'{h}\' and \"Away\" = \'{a}\' and \"Time\" = \'{t}\'
+"""
 
 def find_all_completed_matches(engine, timestamp='2022-09-27 21:00:00.000000'):
     matches = pd.read_sql(sql=sql_all_matches, con=engine)
@@ -24,21 +29,8 @@ def find_all_completed_matches(engine, timestamp='2022-09-27 21:00:00.000000'):
     return matches
 
 
-def test(p=0.95, matchids=[1559766347], timestamp='2022-09-27 21:00:00.000000',max_bet=750):
-    ssh_tunnel = SSHTunnelForwarder(
-        ip,
-        ssh_username='syrovzde',
-        ssh_private_key='C:\\Users\\zdesi\\.ssh\\syrovzde_rsa',
-        remote_bind_address=('localhost', 5432)
-    )
-    ssh_tunnel.start()
-
-    engine = create_engine("postgresql://{user}@{host}:{port}/{db}".format(
-        host='localhost',
-        port=ssh_tunnel.local_bind_port,
-        user='syrovzde',
-        db='asianodds'
-    ))
+def test(p=0.95, matchids=[1559766347], timestamp='2022-09-27 21:00:00.000000',max_bet=750,engine=None,res_engine=None):
+    profits = []
     if matchids[0] == 0:
         matchids = find_all_completed_matches(engine=engine, timestamp=timestamp)
     points = 11
@@ -46,7 +38,7 @@ def test(p=0.95, matchids=[1559766347], timestamp='2022-09-27 21:00:00.000000',m
     probabilities = None
     counter = 0
     succ_counter = 0
-    for matchid in matchids['MatchID'].to_numpy():
+    for matchid,home,away,time,league in matchids[['MatchID','Home','Away','Time','League']].to_numpy():
         matrix_A = pd.DataFrame({'PosState': possible_results})
         timestamp = None
         arb = arbitrage.Arbitrage(engine, schemas=schemas, markets=markets, bookmakers=[], moving_odds=False,max_bet=max_bet)
@@ -65,17 +57,49 @@ def test(p=0.95, matchids=[1559766347], timestamp='2022-09-27 21:00:00.000000',m
                                               markets_cols=markets_cols,
                                               index=index, match_row=match_row, columns=columns)
         _, _, rows_to_drop, probabilities = indices_threshhold(p=p, probabilities=probabilities)
+        matrix_B = matrix_A.copy()
         matrix_A.drop(rows_to_drop, inplace=True)
         succ, x = arb.solve_maxprofit_gurobi(matrix_A=matrix_A, MatchID=None, verbose=False)
         if succ:
+            #print("{h} - {a}".format(h=home,a=away))
             # print(matrix_A.keys())
             succ_counter += 1
             #print(matrix_A.iloc[:, 1:].to_numpy()@x[:-1])
-            print(x[:-1])
-
+            translated_home, translated_away=maping.translate(ao_name_home=home,ao_name_away=away,engine=engine)
+            translated_time = maping.change_date(AO_date=str(time))
+            res=pd.read_sql(sql_results.format(h=translated_home,a=translated_away,t=translated_time),con=res_engine)
+            if not res.empty:
+                res = res.to_numpy()[0][0]
+                #print(matrix_A[res])
+                res_vector = matrix_B.loc[matrix_B['PosState'] == res].to_numpy()[0][1:]
+                profit = np.dot(res_vector,np.array(x[:-1]))
+                profits.append(profit)
         counter += 1
     print(succ_counter / counter)
+    return profits
 # def update_matrix(indices,matrix_a):
 
 
-test(matchids=[0], timestamp='2022-09-27 21:00:00', p=0.95)
+if __name__ == '__main__':
+    ssh_tunnel = SSHTunnelForwarder(
+        ip,
+        ssh_username='syrovzde',
+        ssh_private_key='C:\\Users\\zdesi\\.ssh\\syrovzde_rsa',
+        remote_bind_address=('localhost', 5432)
+    )
+    ssh_tunnel.start()
+
+    engine = create_engine("postgresql://{user}@{host}:{port}/{db}".format(
+        host='localhost',
+        port=ssh_tunnel.local_bind_port,
+        user='syrovzde',
+        db='asianodds'
+    ))
+
+    result_engine = create_engine("postgresql://{user}@{host}:{port}/{db}".format(
+        host='localhost',
+        port=ssh_tunnel.local_bind_port,
+        user='syrovzde',
+        db='betexplorer'
+    ))
+    test(matchids=[0], timestamp='2022-09-27 21:00:00', p=0.95,engine=engine,res_engine=result_engine)
