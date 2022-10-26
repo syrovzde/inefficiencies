@@ -79,6 +79,7 @@ def ou_result_table(totals, points=11):
 
 
 
+
 def ah_result_table(handicap, points=11):
     count = np.size(handicap)
     cums_array = np.ones((points, points))
@@ -109,6 +110,27 @@ def parse_handicap(df: pandas.DataFrame):
     df['Handicap'] = pd.to_numeric(df['Handicap'], errors='coerce')
     df = df.dropna(subset=['Handicap'])
     df = df[(df['Handicap'] % 1 == 0.5) & (df['Handicap'] < 10) & (df['Handicap'] > - 10)]
+    duplicate_list = []
+    checked = []
+    #swapping handicap
+    for i in np.abs(df['Handicap']):
+        if i in checked:
+            duplicate_list.append(i)
+        else:
+            checked.append(i)
+    for i in duplicate_list:
+        swp = df[df['Handicap'] == i]['0'].values[0]
+        df.loc[df['Handicap'] == i,'0'] =  df[df['Handicap'] == -i]['0'].values
+        df.loc[df['Handicap'] == -i,'0'] = swp
+    #case where handicaps are solo f.e -0.5 is in data byt 0.5 not
+    for i in df['Handicap']:
+        if not i in duplicate_list and not abs(i) in duplicate_list:
+            save = df[df['Handicap'] == i]['0'].values[0]
+            df.loc[df['Handicap'] == i,'0'] = 1
+            nw = pd.Series({'Handicap':-i,'0':save,'1':1})
+            df = pd.concat([df,nw.to_frame().T],ignore_index=True)
+    #df['0'] = np.where(df['Handicap'] > 0,1,df['0'])
+    #print(df[df['Handicap'] > 0]['0'])
     # df = df.copy()
     # df['Handicap_2'] = df['Handicap'].str.split(', ').str[-1]
     # df['Handicap'] = df['Handicap'].str.split(', ').str[0]
