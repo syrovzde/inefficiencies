@@ -75,7 +75,7 @@ def ou_result_table(totals, points=11):
         all_under[equal_table[i]] = -0.1
         over[i] = all_over.flatten()
         under[i] = all_under.flatten()
-    return under.T, over.T
+    return over.T, under.T
 
 
 
@@ -93,8 +93,8 @@ def ah_result_table(handicap, points=11):
     for i in range(count):
         all_over = table[i, :] > 0
         all_under = table[i, :] < 0
-        table_one[i] = all_over.flatten()  # home win?
-        table_two[i] = all_under.flatten()
+        table_one[i] = all_over.flatten()  #home win
+        table_two[i] = all_under.flatten() #away win
     return table_one.T, table_two.T
 
 
@@ -110,7 +110,9 @@ def parse_handicap(df: pandas.DataFrame):
     df['Handicap'] = pd.to_numeric(df['Handicap'], errors='coerce')
     df = df.dropna(subset=['Handicap'])
     df = df[(df['Handicap'] % 1 == 0.5) & (df['Handicap'] < 10) & (df['Handicap'] > - 10)]
-    duplicate_list = []
+    #print(df)
+    df['Handicap'] = df['Handicap'].apply(lambda x: x * -1)
+    """duplicate_list = []
     checked = []
     #swapping handicap
     for i in np.abs(df['Handicap']):
@@ -122,24 +124,13 @@ def parse_handicap(df: pandas.DataFrame):
         swp = df[df['Handicap'] == i]['0'].values[0]
         df.loc[df['Handicap'] == i,'0'] =  df[df['Handicap'] == -i]['0'].values
         df.loc[df['Handicap'] == -i,'0'] = swp
-    #case where handicaps are solo f.e -0.5 is in data byt 0.5 not
+    #case where handicaps are solo f.e -0.5 is in data but 0.5 not
     for i in df['Handicap']:
         if not i in duplicate_list and not abs(i) in duplicate_list:
             save = df[df['Handicap'] == i]['0'].values[0]
             df.loc[df['Handicap'] == i,'0'] = 1
             nw = pd.Series({'Handicap':-i,'0':save,'1':1})
-            df = pd.concat([df,nw.to_frame().T],ignore_index=True)
-    #df['0'] = np.where(df['Handicap'] > 0,1,df['0'])
-    #print(df[df['Handicap'] > 0]['0'])
-    # df = df.copy()
-    # df['Handicap_2'] = df['Handicap'].str.split(', ').str[-1]
-    # df['Handicap'] = df['Handicap'].str.split(', ').str[0]
-    # df['Handicap_2'] = pd.to_numeric(df["Handicap_2"], downcast="float")
-    # df['Handicap'] = pd.to_numeric(df["Handicap"], downcast="float")
-    # df = df[(df['Handicap'] % 1 == 0.5) | (df['Handicap_2'] % 1 == 0.5)].copy()
-    # df.loc[df['Handicap_2'] % 1 == 0.5, 'Handicap'] = df.loc[df['Handicap_2'] % 1 == 0.5, 'Handicap_2']
-    # df = df.drop(['Handicap_2'], axis=1)
-    # df = df[(df['Handicap'] < 10 ) & (df['Handicap'] > - 10)] #limit handicap
+            df = pd.concat([df,nw.to_frame().T],ignore_index=True)"""
     return df.copy()
 
 
@@ -377,9 +368,6 @@ if __name__ == '__main__':
     # results = ['1-1', '1-3', '2-2', '3-2']
     #results = ['0-0', '1-0', '0-1', '1-1', '2-1', '1-2', '2-2']
     #totals = ['0', '0, 0.5', '-1', '0.5', '1']
-    handicap = [2.5]
-    under,over = ou_result_table(handicap,4)
-    print(under)
     # over = [2,3,5,1.5,1.2]
     # under = [1.8,1.5,1.2,2.3,8]
     # print(len(over))
@@ -397,4 +385,4 @@ if __name__ == '__main__':
     # print(under.shape)
     #results = pd.Series(results)
     # print(asian_handicap_results(results, None, from_string=True))
-    #print(ah_result_table(pd.Series([1.5]), 10)[0])
+    print(ah_result_table(pd.Series([-1.5]), 5))

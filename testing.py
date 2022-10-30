@@ -55,13 +55,15 @@ def test(p=0.95, matchids=[1559766347], timestamp='2022-09-27 21:00:00.000000',m
                 odds = odds.iloc[-1]
                 #order dependent
                 hlp = {'draw': [odds['x']],'home': [odds['1']], 'away': [odds['2']],  'Timestamp': [odds['Timestamp']]}
+
                 odds = pd.DataFrame(hlp)
+                print(odds,matchid)
                 timestamp = odds['Timestamp'].values[0]
                 #print(timestamp)
+            #    print(odds)
             columns, match_rows = arb.bookmaker_filter_asian_odds(odds=odds, market=market)
-            if market != '1x2':
-                for index, match_row in match_rows.iterrows():
-                    matrix_A = arb.append_columns(matrix_A=matrix_A, market=market, bookmaker="",
+            for index, match_row in match_rows.iterrows():
+                matrix_A = arb.append_columns(matrix_A=matrix_A, market=market, bookmaker="",
                                               markets_cols=markets_cols,
                                               index=index, match_row=match_row, columns=columns)
         _, _, rows_to_drop, probabilities = indices_threshhold(p=p, probabilities=probabilities)
@@ -83,6 +85,17 @@ def test(p=0.95, matchids=[1559766347], timestamp='2022-09-27 21:00:00.000000',m
             res=pd.read_sql(sql_results.format(h=translated_home,a=translated_away,t=translated_time),con=res_engine)
             if not res.empty:
                 res = res.to_numpy()[0][0]
+                indexing = [True]
+                #print(x[:-1])
+                for i in x[:-1]:
+                    if i != 0:
+                        indexing.append(True)
+                    else:
+                        indexing.append(False)
+                #print(matrix_B)
+                print(home,away)
+                print(matrix_B.loc[:,indexing])
+                #print('\n\n\n')
                 res_vector = matrix_B.loc[matrix_B['PosState'] == res].to_numpy()[0][1:]
                 profit = np.dot(res_vector,np.array(x[:-1]))
                 profits.append(profit)
@@ -115,4 +128,4 @@ if __name__ == '__main__':
         user='syrovzde',
         db='betexplorer'
     ))
-    print(test(matchids=[0], timestamp='2022-09-09 21:00:00', p=0.95,engine=engine,res_engine=result_engine))
+    test(matchids=[0], timestamp='2022-09-09 21:00:00', p=0.95,engine=engine,res_engine=result_engine)
