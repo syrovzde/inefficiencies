@@ -9,8 +9,8 @@ import numpy as np
 import maping
 
 schemas = ['asianodds']
-#markets = ['1x2', 'ou', 'ah']
-markets = ['1x2','ou','ah']
+# markets = ['1x2', 'ou', 'ah']
+markets = ['1x2', 'ou', 'ah']
 ip = "147.32.83.171"
 
 markets_cols = {'1x2': ['draw', 'home', 'away'], 'bts': ['NO', 'YES'], 'ou': ['Over', 'Under'], 'ah': ['home', 'away'],
@@ -24,86 +24,100 @@ sql_results = """
 SELECT DISTINCT \"Result\" FROM football.\"Matches\" WHERE \"Home\" = \'{h}\' and \"Away\" = \'{a}\' and \"Time\" = \'{t}\'
 """
 
+
 def find_all_completed_matches(engine, timestamp='2022-09-27 21:00:00.000000'):
     matches = pd.read_sql(sql=sql_all_matches, con=engine)
     matches = matches[matches['Time'] >= timestamp]
     return matches
 
 
-def test(p=0.95, matchids=[1559766347], timestamp='2022-09-27 21:00:00.000000',max_bet=750,engine=None,res_engine=None):
+def find_result(home, away, engine, res_engine, time):
+    translated_home, translated_away = maping.translate(ao_name_home=home, ao_name_away=away, engine=engine)
+    translated_time = maping.change_date(AO_date=str(time))
+    return pd.read_sql(sql_results.format(h=translated_home, a=translated_away, t=translated_time), con=res_engine)
+
+
+def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=750, engine=None, res_engine=None,
+         weighted=False, weights=None, points=11):
     profits = []
     betting_vectors = []
-    if matchids[0] == 0:
-        matchids = find_all_completed_matches(engine=engine, timestamp=timestamp)
-        total = len(matchids)
-    points = 11
-    possible_results = [str(j) + '-' + str(i) for i in range(points) for j in range(points)]
-    probabilities = None
+    weighted = False
+    if weights is not None:
+        weighted = True
     counter = 0
     succ_counter = 0
-    for matchid,home,away,time,league in matchids[['MatchID','Home','Away','Time','League']].to_numpy():
+    total = 0
+    if matchids is None:
+        matchids = find_all_completed_matches(engine=engine, timestamp=timestamp)
+        total = len(matchids)
+    possible_results = [str(j) + '-' + str(i) for i in range(points) for j in range(points)]
+    rows_to_stay, rows_to_drop, probabilities = indices_threshhold(p=p, probabilities=None)
+    if weighted:
+        weights = weights[rows_to_stay]
+    for matchid, home, away, time, league in matchids[['MatchID', 'Home', 'Away', 'Time', 'League']].to_numpy():
         if counter % 1000 == 0:
-            print(counter/total)
+            print(counter / total)
+        res = find_result(home=home, away=away, engine=engine, res_engine=res_engine, time=time)
+        if res.empty:
+            continue
         matrix_A = pd.DataFrame({'PosState': possible_results})
         timestamp = None
-        arb = arbitrage.Arbitrage(engine, schemas=schemas, markets=markets, bookmakers=[], moving_odds=False,max_bet=max_bet)
+        arb = arbitrage.Arbitrage(engine, schemas=schemas, markets=markets, bookmakers=[], moving_odds=False,
+                                  max_bet=max_bet)
         for market in markets:
             odds = ut.load_asian_odds(engine=engine, MatchID=matchid, timestamp=timestamp, market=market)
+            """Timestamps are synchronized over available 1x2 odds"""
             if market == '1x2':
                 if odds.empty:
-                    break
+                    continue
+                """here takes last odds alternatively here could be for loop over all odds"""
                 odds = odds.iloc[-1]
-                #order dependent
-                hlp = {'draw': [odds['x']],'home': [odds['1']], 'away': [odds['2']],  'Timestamp': [odds['Timestamp']]}
-
+                """order dependant"""
+                hlp = {'draw': [odds['x']], 'home': [odds['1']], 'away': [odds['2']], 'Timestamp': [odds['Timestamp']]}
                 odds = pd.DataFrame(hlp)
-                print(odds,matchid)
                 timestamp = odds['Timestamp'].values[0]
-                #print(timestamp)
-            #    print(odds)
             columns, match_rows = arb.bookmaker_filter_asian_odds(odds=odds, market=market)
             for index, match_row in match_rows.iterrows():
                 matrix_A = arb.append_columns(matrix_A=matrix_A, market=market, bookmaker="",
                                               markets_cols=markets_cols,
                                               index=index, match_row=match_row, columns=columns)
-        _, _, rows_to_drop, probabilities = indices_threshhold(p=p, probabilities=probabilities)
-        for i in matrix_A.keys():
-            if i == 'PosState':
-                continue
-            if not np.any(matrix_A[i] > 0):
-                matrix_A.drop(i,axis=1,inplace=True)
         matrix_B = matrix_A.copy()
         matrix_A.drop(rows_to_drop, inplace=True)
-        succ, x = arb.solve_maxprofit_gurobi(matrix_A=matrix_A, MatchID=None, verbose=False)
+        z = None
+        if weighted:
+            succ, x, z = arb.solve_maxprofit_gurobi(matrix_A=matrix_A, MatchID=None, verbose=False, weights=weights)
+        else:
+            succ, x, _ = arb.solve_maxprofit_gurobi(matrix_A=matrix_A, MatchID=None, verbose=False, weights=weights)
         if succ:
-            #print("{h} - {a}".format(h=home,a=away))
-            # print(matrix_A.keys())
             succ_counter += 1
-            #print(matrix_A.iloc[:, 1:].to_numpy()@x[:-1])
-            translated_home, translated_away=maping.translate(ao_name_home=home,ao_name_away=away,engine=engine)
-            translated_time = maping.change_date(AO_date=str(time))
-            res=pd.read_sql(sql_results.format(h=translated_home,a=translated_away,t=translated_time),con=res_engine)
-            if not res.empty:
-                res = res.to_numpy()[0][0]
-                indexing = [True]
-                #print(x[:-1])
-                for i in x[:-1]:
-                    if i != 0:
-                        indexing.append(True)
-                    else:
-                        indexing.append(False)
-                #print(matrix_B)
-                print(home,away)
-                print(matrix_B.loc[:,indexing])
-                #print('\n\n\n')
-                res_vector = matrix_B.loc[matrix_B['PosState'] == res].to_numpy()[0][1:]
-                profit = np.dot(res_vector,np.array(x[:-1]))
-                profits.append(profit)
-                betting_vectors.append(x)
+            res = res.to_numpy()[0][0]
+            # print_arb_columns(matrix_B,x,weighted=weighted)
+            """select row with correct result"""
+            res_vector = matrix_B.loc[matrix_B['PosState'] == res].to_numpy()[0][1:]
+            profit = ret_profit(res_vector=res_vector, weighted=weighted, x=x)
+            print(x)
+            profits.append(profit)
+            betting_vectors.append(x)
         counter += 1
     print(succ_counter / counter)
-    return profits,betting_vectors
-# def update_matrix(indices,matrix_a):
+    return profits, betting_vectors
+
+
+def ret_profit(res_vector, weighted, x):
+    if weighted:
+        return np.dot(res_vector, np.array(x))
+    return np.dot(res_vector, np.array(x[:-1]))
+
+
+def print_arb_columns(matrix_B, x, weighted=False):
+    indexing = [True]
+    arr = x if weighted else x[:-1]
+    for i in arr:
+        if i != 0:
+            indexing.append(True)
+        else:
+            indexing.append(False)
+    print(matrix_B.loc[:, indexing])
 
 
 if __name__ == '__main__':
@@ -128,4 +142,6 @@ if __name__ == '__main__':
         user='syrovzde',
         db='betexplorer'
     ))
-    test(matchids=[0], timestamp='2022-09-09 21:00:00', p=0.95,engine=engine,res_engine=result_engine)
+    weights = np.loadtxt('weights.txt')
+    test(timestamp='2022-09-09 21:00:00', p=1, engine=engine, res_engine=result_engine, weights=weights)
+    #test(timestamp='2022-09-09 21:00:00', p=1, engine=engine, res_engine=result_engine)

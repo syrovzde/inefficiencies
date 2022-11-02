@@ -239,10 +239,13 @@ class Arbitrage:
         column[column == -0.1] = 0
         return column
 
-    def solve_maxprofit_gurobi(self, matrix_A, MatchID, verbose=False, save2db=False):
+    def solve_maxprofit_gurobi(self, matrix_A, MatchID, verbose=False, save2db=False,weights = None):
         # for timestamp in matrixes_dict:
         # matrix_A = matrixes_dict[timestamp][0]
-        model, A, x, y = self.create_model(matrix_A, verbose)
+        if weights is None:
+            model, A, x, y,z = self.create_model(matrix_A=matrix_A, verbose=verbose)
+        else:
+            model,A,x,y,z = self.create_weighted_models(matrix_A=matrix_A,verbose=verbose,weights=weights)
         model.update()
         model.optimize()
         if model.status == GRB.INF_OR_UNBD:
@@ -250,10 +253,12 @@ class Arbitrage:
             # or unbounded
             model.setParam(GRB.Param.Presolve, 0)
             model.optimize()
-        if verbose: self.print_stats(model, A, x, y, matrix_A, None)
         if model.status == GRB.OPTIMAL:
-            return True,x.x
-        return False,None
+            if weights is not None:
+                return True,x.x,z.x
+            else:
+                return True,x.x,None
+        return False,None,None
        #if save2db:
        #     self.save_modelinfo(model, matrix_A, MatchID, x, y, timestamp, matrixes_dict[timestamp][1])
 
@@ -273,7 +278,27 @@ class Arbitrage:
         model.addConstr(A @ x >= np.zeros(A.shape[0]), name="c")
         if not verbose: model.setParam('LogToConsole', 0)
         model.setObjective(x[-1], GRB.MAXIMIZE)
-        return model, A, x, y
+        return model, A, x, y,None
+
+    def create_weighted_models(self,matrix_A,verbose,weights):
+        try:
+            A = matrix_A.iloc[:, 1:].to_numpy()
+        except AttributeError:
+            A = matrix_A
+        N = A.shape[1]
+        M = A.shape[0]
+        #A = np.hstack((A, -np.ones((A.shape[0], 1))))
+        model = gp.Model('LP')
+        x = model.addMVar(shape=N, vtype=GRB.CONTINUOUS, name="x")
+        y = model.addMVar(shape=N, vtype=GRB.BINARY, name="y")
+        z = model.addMVar(shape=M,vtype=GRB.CONTINUOUS,name="z",obj=-weights)
+        model.addConstr(x >= self.min_bet*y)
+        model.addConstr(x <= self.max_bet*y)
+        model.addConstr(z >= 1)
+        model.addConstr(A@x - z >= np.zeros(M),name = 'c')
+        if not verbose: model.setParam('LogToConsole', 0)
+        model.setObjective(z.sum(),sense=gp.GRB.MAXIMIZE)
+        return model,A,x,y,z
 
     def print_stats(self, model, A, x, y, matrix_A, timestamp):
         if model.status == GRB.OPTIMAL:
