@@ -144,7 +144,7 @@ def get_select_script(market, schema, singleID, matchID, limit=True, moving_odds
 def load_asian_odds(engine,MatchID,market,timestamp):
     if market == 'ou':
         odds = pd.read_sql(sql_ou.format(matchid=MatchID, timestamp=timestamp), engine)
-        odds = odds.loc[odds['Over'].str.contains('^\d\.5$')].reset_index(drop=True)
+        odds = odds.loc[odds['Over'].str.contains('^\d\.[0,5]$')].reset_index(drop=True)
         return odds
     if market == 'ah':
         odds = pd.read_sql(sql_ah.format(matchid=MatchID, timestamp=timestamp), engine)

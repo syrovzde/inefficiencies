@@ -10,7 +10,7 @@ import maping
 
 schemas = ['asianodds']
 # markets = ['1x2', 'ou', 'ah']
-markets = ['1x2', 'ou', 'ah']
+markets = ['1x2', 'ou']
 ip = "147.32.83.171"
 
 markets_cols = {'1x2': ['draw', 'home', 'away'], 'bts': ['NO', 'YES'], 'ou': ['Over', 'Under'], 'ah': ['home', 'away'],
@@ -18,6 +18,9 @@ markets_cols = {'1x2': ['draw', 'home', 'away'], 'bts': ['NO', 'YES'], 'ou': ['O
 
 sql_all_matches = """
 SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\"
+"""
+sql_one_match = """
+SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\" WHERE \"MatchID\" = \'{id}\'
 """
 
 sql_results = """
@@ -30,11 +33,27 @@ def find_all_completed_matches(engine, timestamp='2022-09-27 21:00:00.000000'):
     matches = matches[matches['Time'] >= timestamp]
     return matches
 
+def find_one_match(engine,matchID):
+    matches = pd.read_sql(sql=sql_one_match.format(id=matchID),con=engine)
+    return matches
 
 def find_result(home, away, engine, res_engine, time):
     translated_home, translated_away = maping.translate(ao_name_home=home, ao_name_away=away, engine=engine)
     translated_time = maping.change_date(AO_date=str(time))
     return pd.read_sql(sql_results.format(h=translated_home, a=translated_away, t=translated_time), con=res_engine)
+
+
+def calculate_mapping(matchids=None,engine=None, res_engine=None):
+    timestamp = '2022-09-09 21:00:00'
+    if matchids is None:
+        matchids = find_all_completed_matches(engine=engine, timestamp=timestamp)
+    for matchid, home, away, time, league in matchids[['MatchID', 'Home', 'Away', 'Time', 'League']].to_numpy():
+        if  "No. of" in home:
+            continue
+        maping.find_match(ao_home=home,ao_away=away,engine=res_engine,date=time,league=league)
+    return None
+
+
 
 
 def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=750, engine=None, res_engine=None,
@@ -46,19 +65,21 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
         weighted = True
     counter = 0
     succ_counter = 0
+    res_available = 0
     total = 0
     if matchids is None:
         matchids = find_all_completed_matches(engine=engine, timestamp=timestamp)
-        total = len(matchids)
+    #else:
+    #    matchids = find_one_match(engine=engine,matchID=matchids[0])
     possible_results = [str(j) + '-' + str(i) for i in range(points) for j in range(points)]
     rows_to_stay, rows_to_drop, probabilities = indices_threshhold(p=p, probabilities=None)
     if weighted:
         weights = weights[rows_to_stay]
     for matchid, home, away, time, league in matchids[['MatchID', 'Home', 'Away', 'Time', 'League']].to_numpy():
-        if counter % 1000 == 0:
-            print(counter / total)
+
         res = find_result(home=home, away=away, engine=engine, res_engine=res_engine, time=time)
         if res.empty:
+            counter+=1
             continue
         matrix_A = pd.DataFrame({'PosState': possible_results})
         timestamp = None
@@ -66,12 +87,17 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
                                   max_bet=max_bet)
         for market in markets:
             odds = ut.load_asian_odds(engine=engine, MatchID=matchid, timestamp=timestamp, market=market)
+            #if market == 'ah':
+                #odds.iloc[0,1] = 1.25
             """Timestamps are synchronized over available 1x2 odds"""
             if market == '1x2':
                 if odds.empty:
-                    continue
-                """here takes last odds alternatively here could be for loop over all odds"""
+                    break
+                """here takes last odds alternatively here could be for loop over all timestamps"""
                 odds = odds.iloc[-1]
+                #odds[0] = 1.3
+                #odds[1] = 1.2
+                #odds[2] = 3.91
                 """order dependant"""
                 hlp = {'draw': [odds['x']], 'home': [odds['1']], 'away': [odds['2']], 'Timestamp': [odds['Timestamp']]}
                 odds = pd.DataFrame(hlp)
@@ -83,7 +109,6 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
                                               index=index, match_row=match_row, columns=columns)
         matrix_B = matrix_A.copy()
         matrix_A.drop(rows_to_drop, inplace=True)
-        z = None
         if weighted:
             succ, x, z = arb.solve_maxprofit_gurobi(matrix_A=matrix_A, MatchID=None, verbose=False, weights=weights)
         else:
@@ -91,15 +116,18 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
         if succ:
             succ_counter += 1
             res = res.to_numpy()[0][0]
-            # print_arb_columns(matrix_B,x,weighted=weighted)
+            print(home,away,matchid,timestamp,res)
+            print_arb_columns(matrix_B,x,weighted=weighted)
             """select row with correct result"""
             res_vector = matrix_B.loc[matrix_B['PosState'] == res].to_numpy()[0][1:]
             profit = ret_profit(res_vector=res_vector, weighted=weighted, x=x)
-            print(x)
+            print(profit/np.sum(x[:-1]))
             profits.append(profit)
+            #print(succ_counter/res_available)
             betting_vectors.append(x)
         counter += 1
-    print(succ_counter / counter)
+        res_available +=1
+    print(succ_counter / res_available)
     return profits, betting_vectors
 
 
@@ -143,5 +171,7 @@ if __name__ == '__main__':
         db='betexplorer'
     ))
     weights = np.loadtxt('weights.txt')
-    test(timestamp='2022-09-09 21:00:00', p=1, engine=engine, res_engine=result_engine, weights=weights)
-    #test(timestamp='2022-09-09 21:00:00', p=1, engine=engine, res_engine=result_engine)
+    #test(timestamp='2022-09-09 21:00:00', p=1, engine=engine, res_engine=result_engine, weights=weights)
+    #test(timestamp='2022-09-09 21:00:00', p=1, engine=engine, res_engine=result_engine,matchids=['1559692220'])
+    #test(timestamp='2022-10-01 21:00:00', p=1, engine=engine, res_engine=result_engine)
+    calculate_mapping(engine=engine,res_engine=result_engine,)
