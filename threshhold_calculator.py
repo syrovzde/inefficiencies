@@ -24,7 +24,7 @@ def indices_threshhold(p=0.97,probabilities=None,points=10):
         cur_index += 1
         if cur_value <= p:
             reached_threshold = True
-    return indices[:(points+1)**2-cur_index],indices[(points+1)**2-cur_index:],probabilities
+    return indices[:(points+1)**2-cur_index],indices[(points+1)**2-cur_index:],flatten
 
 
 if __name__ == '__main__':
