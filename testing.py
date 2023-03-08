@@ -1,3 +1,4 @@
+import pandas
 import pandas as pd
 from sqlalchemy import create_engine
 from sshtunnel import SSHTunnelForwarder
@@ -10,7 +11,7 @@ import maping
 
 schemas = ['asianodds']
 # markets = ['1x2', 'ou', 'ah']
-markets = ['ou','ah']
+markets = ['ou', 'ah']
 ip = "147.32.83.171"
 
 markets_cols = {'1x2': ['draw', 'home', 'away'], 'bts': ['NO', 'YES'], 'ou': ['Over', 'Under'], 'ah': ['home', 'away'],
@@ -20,11 +21,19 @@ sql_all_matches = """
 SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\"
 """
 sql_one_match = """
-SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\" WHERE \"MatchID\" = \'{id}\'
+SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\"FROM asianodds.\"Matches\" WHERE \"MatchID\" = \'{id}\'
 """
 
 sql_results = """
 SELECT DISTINCT \"Result\" FROM football.\"Matches\" WHERE \"Home\" = \'{h}\' and \"Away\" = \'{a}\' and \"Time\" = \'{t}\'
+"""
+
+sql_results_id = """
+SELECT \"Result\", \"Home\", \"Away\",  \"Time\", \"League\", \"Season\"  FROM football.\"Matches\" WHERE \"MatchID\" =  \'{matchid}\'
+"""
+
+sql_all_results = """
+SELECT \"MatchID\", \"Result\", \"Home\", \"Away\",  \"Time\", \"League\", \"Season\"  FROM football.\"Matches\" WHERE \"Season\" = \'2022\' or \"Season\" = \'2023\'
 """
 
 
@@ -34,9 +43,11 @@ def find_all_completed_matches(engine, timestamp='2022-09-27 21:00:00.000000'):
     matches = matches[matches['Time'] > '2022-11-13 01:00:00.000000']
     return matches
 
-def find_one_match(engine,matchID):
-    matches = pd.read_sql(sql=sql_one_match.format(id=matchID),con=engine)
+
+def find_one_match(engine, matchID):
+    matches = pd.read_sql(sql=sql_one_match.format(id=matchID), con=engine)
     return matches
+
 
 def find_result(home, away, engine, res_engine, time):
     translated_home, translated_away = maping.translate(ao_name_home=home, ao_name_away=away)
@@ -44,7 +55,7 @@ def find_result(home, away, engine, res_engine, time):
     return pd.read_sql(sql_results.format(h=translated_home, a=translated_away, t=translated_time), con=res_engine)
 
 
-def calculate_mapping(matchids=None,engine=None, res_engine=None):
+def calculate_mapping(matchids=None, engine=None, res_engine=None):
     timestamp = '2022-11-13 00:00:00'
     succ = 1
     so_far = 0
@@ -55,14 +66,13 @@ def calculate_mapping(matchids=None,engine=None, res_engine=None):
     translate_table = pd.read_csv(csv_file_with_mapping)
     for matchid, home, away, time, league in matchids[['MatchID', 'Home', 'Away', 'Time', 'League']].to_numpy():
         print(league)
-        so_far +=1
-        if  "No. of" in home:
+        so_far += 1
+        if "No. of" in home:
             continue
-        count,translate_table = maping.find_match(ao_home=home,ao_away=away,engine=res_engine,date=time,league=league,translate_table=translate_table)
+        count, translate_table = maping.find_match(ao_home=home, ao_away=away, engine=res_engine, date=time,
+                                                   league=league, translate_table=translate_table)
         succ += count
-        print(succ/so_far)
-
-
+        print(succ / so_far)
 
 
 def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=750, engine=None, res_engine=None,
@@ -83,15 +93,15 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
     rows_to_stay, rows_to_drop, probabilities = indices_threshhold(p=p, probabilities=None)
     print(len(matchids))
     if weighted:
-        #print(probabilities)
+        # print(probabilities)
         weights = probabilities[rows_to_stay]
     for matchid, home, away, time, league in matchids[['MatchID', 'Home', 'Away', 'Time', 'League']].to_numpy():
-        #print(time)
+        # print(time)
         if '\'' in home or '\'' in away:
             continue
         res = find_result(home=home, away=away, engine=engine, res_engine=res_engine, time=time)
         if res.empty:
-            counter+=1
+            counter += 1
             continue
         try:
             res = res.to_numpy()[0][0]
@@ -99,11 +109,11 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
             continue
         timestamp = None
         arb = arbitrage.Arbitrage(engine, schemas=schemas, markets=markets, bookmakers=[], moving_odds=False,
-                                      max_bet=max_bet)
+                                  max_bet=max_bet)
         xodds = ut.load_asian_odds(engine=engine, MatchID=matchid, timestamp=timestamp, market='1x2')
         if xodds.empty:
             continue
-        for index,odds in xodds.iterrows():
+        for index, odds in xodds.iterrows():
             matrix_A = pd.DataFrame({'PosState': possible_results})
             hlp = {'draw': [odds['x']], 'home': [odds['1']], 'away': [odds['2']], 'Timestamp': [odds['Timestamp']]}
             odds = pd.DataFrame(hlp)
@@ -111,15 +121,15 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
             columns, match_rows = arb.bookmaker_filter_asian_odds(odds=odds, market='1x2')
             for index, match_row in match_rows.iterrows():
                 matrix_A = arb.append_columns(matrix_A=matrix_A, market='1x2', bookmaker="",
-                                                      markets_cols=markets_cols,
-                                                      index=index, match_row=match_row, columns=columns)
+                                              markets_cols=markets_cols,
+                                              index=index, match_row=match_row, columns=columns)
             for market in markets:
                 dif_odds = ut.load_asian_odds(engine=engine, MatchID=matchid, timestamp=timestamp, market=market)
                 columns, match_rows = arb.bookmaker_filter_asian_odds(odds=dif_odds, market=market)
                 for index, match_row in match_rows.iterrows():
                     matrix_A = arb.append_columns(matrix_A=matrix_A, market=market, bookmaker="",
-                                                          markets_cols=markets_cols,
-                                                          index=index, match_row=match_row, columns=columns)
+                                                  markets_cols=markets_cols,
+                                                  index=index, match_row=match_row, columns=columns)
             matrix_B = matrix_A.copy()
             matrix_A.drop(rows_to_drop, inplace=True)
             if weighted:
@@ -128,20 +138,20 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
                 succ, x, _ = arb.solve_maxprofit_gurobi(matrix_A=matrix_A, MatchID=None, verbose=False, weights=weights)
             if succ:
                 succ_counter += 1
-                #print_arb_columns(matrix_B,x,weighted=weighted)
+                # print_arb_columns(matrix_B,x,weighted=weighted)
                 res_vector = matrix_B.loc[matrix_B['PosState'] == res].to_numpy()[0][1:]
                 profit = ret_profit(res_vector=res_vector, weighted=weighted, x=x)
-                #print(profit)
-                #print(profit/np.sum(x[:-1]))
+                # print(profit)
+                # print(profit/np.sum(x[:-1]))
                 profits.append(profit)
                 matchids_profit.append(matchid)
-                #print(succ_counter/res_available)
+                # print(succ_counter/res_available)
                 betting_vectors.append(x)
                 counter += 1
-                res_available +=1
-    #print(succ_counter)
-    #print(succ_counter / res_available)
-    return profits, betting_vectors,matchids_profit
+                res_available += 1
+    # print(succ_counter)
+    # print(succ_counter / res_available)
+    return profits, betting_vectors, matchids_profit
 
 
 def ret_profit(res_vector, weighted, x):
@@ -183,7 +193,20 @@ if __name__ == '__main__':
         user='syrovzde',
         db='betexplorer'
     ))
-    weights = np.loadtxt('weights.txt')
-    #test(timestamp='2022-11-13 21:00:00', p=1, engine=engine, res_engine=result_engine, weights=weights)
-    test(timestamp='2022-11-13 21:00:00', p=1, engine=engine, res_engine=result_engine)
-    #test(timestamp='2022-11-13 21:00:00', p=0.8, engine=engine, res_engine=result_engine)
+    # lambdas = np.loadtxt('cleaned_lambdas.csv')
+    lambdas = pandas.read_csv('cleaned_lambdas.csv')
+    all_matches = pandas.read_sql(sql_all_results, result_engine)
+    ids = lambdas["MatchID"].values
+    print(all_matches[all_matches['MatchID'].isin(ids)])
+    #for match_id in ids:
+        #print(match_id)
+    #    tmp = all_matches[all_matches['MatchID'] == match_id]
+    #    if not tmp.empty:
+    #        print(tmp)
+    # result = df[df['col1'].isin(arr)
+    # for match in lambdas["MatchID"]:
+    #    k=pandas.read_sql(sql_results_id.format(matchid=match),result_engine)
+    #    print(k.head())
+    # test(timestamp='2022-11-13 21:00:00', p=1, engine=engine, res_engine=result_engine, weights=weights)
+    # test(timestamp='2022-11-13 21:00:00', p=1, engine=engine, res_engine=result_engine)
+    # test(timestamp='2022-11-13 21:00:00', p=0.8, engine=engine, res_engine=result_engine)
