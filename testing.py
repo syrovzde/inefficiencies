@@ -39,8 +39,8 @@ SELECT \"MatchID\", \"Result\", \"Home\", \"Away\",  \"Time\", \"League\", \"Sea
 
 def find_all_completed_matches(engine, timestamp='2022-09-27 21:00:00.000000'):
     matches = pd.read_sql(sql=sql_all_matches, con=engine)
-    matches = matches[matches['Time'] <= timestamp]
-    matches = matches[matches['Time'] > '2022-11-13 01:00:00.000000']
+    #matches = matches[matches['Time'] <= timestamp]
+    matches = matches[matches['Time'] > timestamp]
     return matches
 
 
@@ -80,28 +80,31 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
     profits = []
     betting_vectors = []
     matchids_profit = []
-    weighted = False
     if weights is not None:
         weighted = True
     counter = 0
     succ_counter = 0
     res_available = 0
-    total = 0
     if matchids is None:
         matchids = find_all_completed_matches(engine=engine, timestamp=timestamp)
+    else:
+        matches = find_all_completed_matches(engine=engine,timestamp='2022-01-01 21:00:00')
+        matchids = matches[matches['MatchID'].isin(matchids)]
+
     possible_results = [str(j) + '-' + str(i) for i in range(points) for j in range(points)]
     rows_to_stay, rows_to_drop, probabilities = indices_threshhold(p=p, probabilities=None)
     print(len(matchids))
     if weighted:
-        # print(probabilities)
         weights = probabilities[rows_to_stay]
+        #weights[:] = 1/121
     for matchid, home, away, time, league in matchids[['MatchID', 'Home', 'Away', 'Time', 'League']].to_numpy():
-        # print(time)
+        counter += 1
+        if counter % 100 == 0:
+            print(counter)
         if '\'' in home or '\'' in away:
             continue
         res = find_result(home=home, away=away, engine=engine, res_engine=res_engine, time=time)
         if res.empty:
-            counter += 1
             continue
         try:
             res = res.to_numpy()[0][0]
@@ -137,6 +140,9 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
             else:
                 succ, x, _ = arb.solve_maxprofit_gurobi(matrix_A=matrix_A, MatchID=None, verbose=False, weights=weights)
             if succ:
+                file1 = open("found_arb.txt", "a")
+                file1.write("{id}\n".format(id=matchid))
+                file1.close()
                 succ_counter += 1
                 # print_arb_columns(matrix_B,x,weighted=weighted)
                 res_vector = matrix_B.loc[matrix_B['PosState'] == res].to_numpy()[0][1:]
@@ -147,7 +153,6 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
                 matchids_profit.append(matchid)
                 # print(succ_counter/res_available)
                 betting_vectors.append(x)
-                counter += 1
                 res_available += 1
     # print(succ_counter)
     # print(succ_counter / res_available)
@@ -159,6 +164,12 @@ def ret_profit(res_vector, weighted, x):
         return np.dot(res_vector, np.array(x))
     return np.dot(res_vector, np.array(x[:-1]))
 
+
+def preprocess(result_engine):
+    lambdas = pandas.read_csv('cleaned_lambdas.csv')
+    all_matches = pandas.read_sql(sql_all_results, result_engine)
+    ids = lambdas["MatchID"].values
+    print(all_matches[all_matches['MatchID'].isin(ids)])
 
 def print_arb_columns(matrix_B, x, weighted=False):
     indexing = [True]
@@ -193,20 +204,8 @@ if __name__ == '__main__':
         user='syrovzde',
         db='betexplorer'
     ))
-    # lambdas = np.loadtxt('cleaned_lambdas.csv')
-    lambdas = pandas.read_csv('cleaned_lambdas.csv')
-    all_matches = pandas.read_sql(sql_all_results, result_engine)
-    ids = lambdas["MatchID"].values
-    print(all_matches[all_matches['MatchID'].isin(ids)])
-    #for match_id in ids:
-        #print(match_id)
-    #    tmp = all_matches[all_matches['MatchID'] == match_id]
-    #    if not tmp.empty:
-    #        print(tmp)
-    # result = df[df['col1'].isin(arr)
-    # for match in lambdas["MatchID"]:
-    #    k=pandas.read_sql(sql_results_id.format(matchid=match),result_engine)
-    #    print(k.head())
+
     # test(timestamp='2022-11-13 21:00:00', p=1, engine=engine, res_engine=result_engine, weights=weights)
     # test(timestamp='2022-11-13 21:00:00', p=1, engine=engine, res_engine=result_engine)
-    # test(timestamp='2022-11-13 21:00:00', p=0.8, engine=engine, res_engine=result_engine)
+    #test(timestamp='2022-01-01 21:00:00', p=1, engine=engine, res_engine=result_engine)
+    test(p=1,engine=engine,res_engine=result_engine,timestamp='2022-01-15 21:00:00')

@@ -21,20 +21,6 @@ SELECT DISTINCT \"Home\",\"Away\" FROM asianodds.\"Matches\" where \"Home\"=\'{h
 sql_matches_by_date  = """
 SELECT DISTINCT \"Home\",\"Away\" FROM football.\"Matches\" where \"Time\" = \'{t}\'
 """
-ssh_tunnel = SSHTunnelForwarder(
-    ip,
-    ssh_username='syrovzde',
-    ssh_private_key='C:\\Users\\zdesi\\.ssh\\syrovzde_rsa',
-    remote_bind_address=('localhost', 5432)
-)
-ssh_tunnel.start()
-
-engine = create_engine("postgresql://{user}@{host}:{port}/{db}".format(
-    host='localhost',
-    port=ssh_tunnel.local_bind_port,
-    user='syrovzde',
-    db='asianodds'
-))
 
 def change_date(AO_date:str):
     parsed = AO_date.split('-')
