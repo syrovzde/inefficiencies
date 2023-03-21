@@ -88,14 +88,14 @@ def find_match(ao_home,ao_away,engine=None,date=None,translate_table=None,league
             if choice is not None:
                 translate_table=translate_table.append(pd.Series(choice),ignore_index=True)
                 print(translate_table)
-                translate_table.to_csv("bet_AsianOdds_AO2BE.csv")
+                translate_table.to_csv("csv_files/bet_AsianOdds_AO2BE.csv")
             return 0,translate_table
     return 1,translate_table
             #print(home)
 
 if __name__ == '__main__':
-    df = pd.read_csv("bet_AsianOdds_AO2BE.csv",index_col=0)
+    df = pd.read_csv("csv_files/bet_AsianOdds_AO2BE.csv",index_col=0)
     df.drop(df.columns[df.columns.str.contains('unnamed', case=False)], axis=1, inplace=True)
     df.drop_duplicates(inplace=True)
     print(df)
-    df.to_csv("bet_AsianOdds_AO2BE.csv")
+    df.to_csv("csv_files/bet_AsianOdds_AO2BE.csv")

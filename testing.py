@@ -1,4 +1,3 @@
-import pandas
 import pandas as pd
 from sqlalchemy import create_engine
 from sshtunnel import SSHTunnelForwarder
@@ -75,6 +74,15 @@ def calculate_mapping(matchids=None, engine=None, res_engine=None):
         print(succ / so_far)
 
 
+def res_test(res):
+    if res.empty:
+        return False
+    try:
+        res = res.to_numpy()[0][0]
+    except AttributeError:
+        return False
+    return True
+
 def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=750, engine=None, res_engine=None,
          weighted=False, weights=None, points=11):
     profits = []
@@ -98,18 +106,12 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
         weights = probabilities[rows_to_stay]
         #weights[:] = 1/121
     for matchid, home, away, time, league in matchids[['MatchID', 'Home', 'Away', 'Time', 'League']].to_numpy():
-        counter += 1
-        if counter % 100 == 0:
-            print(counter)
         if '\'' in home or '\'' in away:
             continue
         res = find_result(home=home, away=away, engine=engine, res_engine=res_engine, time=time)
-        if res.empty:
+        if not res_test(res):
             continue
-        try:
-            res = res.to_numpy()[0][0]
-        except AttributeError:
-            continue
+        res = res.to_numpy()[0][0]
         timestamp = None
         arb = arbitrage.Arbitrage(engine, schemas=schemas, markets=markets, bookmakers=[], moving_odds=False,
                                   max_bet=max_bet)
@@ -144,18 +146,12 @@ def test(p=0.95, matchids=None, timestamp='2022-09-27 21:00:00.000000', max_bet=
                 file1.write("{id}\n".format(id=matchid))
                 file1.close()
                 succ_counter += 1
-                # print_arb_columns(matrix_B,x,weighted=weighted)
                 res_vector = matrix_B.loc[matrix_B['PosState'] == res].to_numpy()[0][1:]
                 profit = ret_profit(res_vector=res_vector, weighted=weighted, x=x)
-                # print(profit)
-                # print(profit/np.sum(x[:-1]))
                 profits.append(profit)
                 matchids_profit.append(matchid)
-                # print(succ_counter/res_available)
                 betting_vectors.append(x)
                 res_available += 1
-    # print(succ_counter)
-    # print(succ_counter / res_available)
     return profits, betting_vectors, matchids_profit
 
 
@@ -166,8 +162,8 @@ def ret_profit(res_vector, weighted, x):
 
 
 def preprocess(result_engine):
-    lambdas = pandas.read_csv('cleaned_lambdas.csv')
-    all_matches = pandas.read_sql(sql_all_results, result_engine)
+    lambdas = pd.read_csv('cleaned_lambdas.csv')
+    all_matches = pd.read_sql(sql_all_results, result_engine)
     ids = lambdas["MatchID"].values
     print(all_matches[all_matches['MatchID'].isin(ids)])
 
