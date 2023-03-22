@@ -16,7 +16,6 @@ markets_cols = {'1x2': ['draw', 'home', 'away'], 'bts': ['NO', 'YES'], 'ou': ['U
                 'dc': ['homedraw', 'homeaway', 'awaydraw']}  # order is important
 odds_type = {'closing': 0, 'opening': 1}
 
-# 10Bet, 188BET, Betsafe
 sql_x = """ SELECT \"1\",\"2\",\"x\",\"Timestamp\" FROM asianodds.\"Odds_1x2_FT\" WHERE \"Odds_1x2_FT\".\"MatchID\" = \'{matchid}\'
 """
 
@@ -24,6 +23,7 @@ sql_ou = """SELECT
 \"Over\",\"1\",\"2\" FROM asianodds.\"Odds_ou_FT\" WHERE \"Odds_ou_FT\".\"MatchID\" = \'{matchid}\' AND
 \"Odds_ou_FT\".\"Timestamp\" = \'{timestamp}\'
 """
+
 sql_ah = """ SELECT 
 \"Handicap\","1",\"2\"FROM asianodds.\"Odds_ah_FT\" WHERE \"Odds_ah_FT\".\"MatchID\" = \'{matchid}\' AND
 \"Odds_ah_FT\".\"Timestamp\" = \'{timestamp}\'

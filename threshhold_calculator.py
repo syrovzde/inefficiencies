@@ -10,7 +10,7 @@ def transform_index_to_2D(indexes,points=10):
 
 def indices_threshhold(p=0.97,probabilities=None,points=10):
     if probabilities is None:
-        probabilities = np.loadtxt('probability.txt')
+        probabilities = np.loadtxt('txt_files/probability.txt')
         probabilities = probabilities / np.sum(probabilities)
     flatten = probabilities.reshape(-1)
     indices = np.argsort(-flatten)
@@ -28,8 +28,8 @@ def indices_threshhold(p=0.97,probabilities=None,points=10):
 
 
 if __name__ == '__main__':
-    probabilities = np.loadtxt('probability.txt')
+    probabilities = np.loadtxt('txt_files/probability.txt')
     #for numerical stability
     probabilities = np.sum(probabilities)/(probabilities+1)
     probabilities=probabilities.flatten()
-    np.savetxt('weights.txt',probabilities)
+    np.savetxt('txt_files/weights.txt',probabilities)
