@@ -16,6 +16,8 @@ sql_matches_by_date = """
 SELECT DISTINCT \"Home\",\"Away\" FROM football.\"Matches\" where \"Time\" = \'{t}\'
 """
 
+csv_file_with_mapping='csv_files/bet_AsianOdds_AO2BE.csv'
+
 
 def change_date(AO_date: str):
     parsed = AO_date.split('-')
