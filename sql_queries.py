@@ -2,6 +2,11 @@
 sql_all_matches = """
 SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\"
 """
+
+sql_all_matches_limited = """
+SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\"
+"""
+
 sql_one_match = """
 SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\"FROM asianodds.\"Matches\" WHERE \"MatchID\" = \'{id}\'
 """

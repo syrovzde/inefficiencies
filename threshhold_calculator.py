@@ -25,11 +25,3 @@ def indices_threshhold(p=0.97,probabilities=None,points=10):
         if cur_value <= p:
             reached_threshold = True
     return indices[:(points+1)**2-cur_index],indices[(points+1)**2-cur_index:],flatten
-
-
-if __name__ == '__main__':
-    probabilities = np.loadtxt('txt_files/probability.txt')
-    #for numerical stability
-    probabilities = np.sum(probabilities)/(probabilities+1)
-    probabilities=probabilities.flatten()
-    np.savetxt('txt_files/weights.txt',probabilities)

@@ -59,18 +59,6 @@ class Arbitrage:
                 odds_done_table = 'Matches'
             MatchIDs = pd.read_sql_table(odds_done_table, self.db, schema=schema)  # ['MatchID']
 
-            # try:
-            #     arbitrages = pd.read_sql_table(self.table_name, self.db,
-            #                                schema=schema)  # check if data are already analyzed
-            #     arbitrages = arbitrages[
-            #         (arbitrages['Min_bet'] == self.min_bet) & (arbitrages['Timelimit'] == self.timelimit)
-            #         & (arbitrages['Max_bet'] == self.max_bet) & (arbitrages[self.bookmakers].all(axis='columns'))
-            #         & (arbitrages[self.markets].all(axis='columns'))]
-            #     MatchIDs = pd.merge(MatchIDs, arbitrages, on=['MatchID'], how="outer", indicator=True)
-            #     MatchIDs = MatchIDs[MatchIDs['_merge'] == 'left_only']
-            # except ValueError:
-            #     pass
-
             for MatchID in set(MatchIDs['MatchID']):
                 print('Looking for arbitrage for ', MatchID)
                 matrixes_dict = self.create_matrix(schema, MatchID)
@@ -239,15 +227,16 @@ class Arbitrage:
         column[column == -0.1] = 0
         return column
 
-    def solve_maxprofit_gurobi(self, matrix_A, MatchID, verbose=False, save2db=False,weights = None):
+    def solve_maxprofit_gurobi(self, matrix_A, MatchID=None, verbose=False, save2db=False,weights = None,threshold=0):
         # for timestamp in matrixes_dict:
         # matrix_A = matrixes_dict[timestamp][0]
         if weights is None:
             model, A, x, y,z = self.create_model(matrix_A=matrix_A, verbose=verbose)
         else:
-            model,A,x,y,z = self.create_weighted_models(matrix_A=matrix_A,verbose=verbose,weights=weights)
+            model,A,x,y,z = self.create_weighted_models(matrix_A=matrix_A,verbose=verbose,weights=weights,threshold=threshold)
         model.update()
         model.optimize()
+        #print(model.getObjective())
         if model.status == GRB.INF_OR_UNBD:
             # Turn presolve off to determine whether model is infeasible
             # or unbounded
@@ -272,32 +261,38 @@ class Arbitrage:
         model = gp.Model('LP')
         x = model.addMVar(shape=N + 1, vtype=GRB.CONTINUOUS, name="x")
         y = model.addMVar(shape=N, vtype=GRB.BINARY, name="y")
+
         model.addConstr(x[:-1] >= self.min_bet * y)
         model.addConstr(x[:-1] <= self.max_bet * y)
-        model.addConstr(x[-1] >= 1)
+        #model.addConstr(x[-1] >= 1)
         model.addConstr(A @ x >= np.zeros(A.shape[0]), name="c")
         if not verbose: model.setParam('LogToConsole', 0)
         model.setObjective(x[-1], GRB.MAXIMIZE)
+
         return model, A, x, y,None
 
-    def create_weighted_models(self,matrix_A,verbose,weights):
+    def create_weighted_models(self,matrix_A,verbose,weights,threshold=0):
         try:
             A = matrix_A.iloc[:, 1:].to_numpy()
         except AttributeError:
             A = matrix_A
         N = A.shape[1]
         M = A.shape[0]
-        #A = np.hstack((A, -np.ones((A.shape[0], 1))))
         model = gp.Model('LP')
         x = model.addMVar(shape=N, vtype=GRB.CONTINUOUS, name="x")
         y = model.addMVar(shape=N, vtype=GRB.BINARY, name="y")
-        z = model.addMVar(shape=M,vtype=GRB.CONTINUOUS,name="z",obj=-weights)
+        z = model.addMVar(M,vtype=GRB.CONTINUOUS,name="z")
         model.addConstr(x >= self.min_bet*y)
         model.addConstr(x <= self.max_bet*y)
-        model.addConstr(z >= 1)
-        model.addConstr(A@x - z >= np.zeros(M),name = 'c')
+        #chyba?
+        # 200
+        model.addConstr(z >= 10)
+        model.addConstr(A@x - z >= -threshold*self.max_bet, name = 'c')
+        #model.addConstr(A@x - z <= 0, name='c')
+        #model.addConstr(A@x >= z, name='c')
         if not verbose: model.setParam('LogToConsole', 0)
-        model.setObjective(z.sum(),sense=gp.GRB.MAXIMIZE)
+        weighted_sum = sum(weights[i] * z[i] for i in range(M))
+        model.setObjective(weighted_sum,sense=gp.GRB.MAXIMIZE)
         return model,A,x,y,z
 
     def print_stats(self, model, A, x, y, matrix_A, timestamp):
@@ -375,49 +370,3 @@ class Arbitrage:
                         column_name = '{}_{}_{}'.format(b, m, mc)
                         columns.append(column_name)
         return columns
-
-#
-# def solve_maxprofit(matrix_A, budget, MatchID, markets, bookmakers, db, odds_time):
-#     matrix = matrix_A.iloc[:, 1:].to_numpy()
-#     c = np.zeros(matrix.shape[1] + 1, dtype=np.int)
-#     c[-1] = -1  # -1 because we are maximizing
-#     b_ub = np.zeros(matrix.shape[0] + 1, dtype=np.int)
-#     b_ub[-1] = budget
-#     A = np.hstack((-matrix, np.ones((matrix.shape[0], 1))))
-#     budget_vector = np.ones((1, matrix.shape[1] + 1))
-#     budget_vector[-1] = 0
-#     A = np.vstack((A, budget_vector))
-#     bounds = [(0, budget) for i in range(A.shape[1] - 1)]
-#     bounds.append((1, budget))
-#     try:
-#         res = optimize.linprog(c=c, A_ub=A, b_ub=b_ub, bounds=bounds, method='revised simplex')
-#     except Exception as e:
-#         print(e)
-#         return
-#     print('Scipy ', MatchID)
-#
-#     if res['success']:
-#         print('Success: ', res['success'], ' Status:', exit_status[res['status']])
-#         #print('result sum(x): ', sum(res['x'][:-1]))
-#         print('Profit: ', res['x'][-1])
-#         print('x: ', res['x'])
-#         print('Profit (%): ', res['x'][-1] / sum(res['x'][:-1]))
-#         print('Multiplication result min: ', min(matrix @ res['x'][:-1]))
-#         print()
-#         dct = {'MatchID': [MatchID], 'ArbPos': [True], 'Odds_type': [odds_time],
-#                'Budget': budget, 'Betsum': sum(res['x'][:-1]), 'Profit_prop': res['x'][-1] / sum(res['x'][:-1]), }
-#         for m in all_markets:
-#             dct[m] = m in markets
-#         for b in all_bookmakers:
-#             dct[b] = b in bookmakers
-#         df = pd.DataFrame(dct)
-#         if len(bookmakers) == 1:
-#             table_name = 'Arbitrage_1BM'
-#         else:
-#             table_name = 'Arbitrage_moreBM'
-#         utils.upsert_table(df, table_name, db, 'football', update_on_conflict=True, update_cols=df.columns,
-#                            unique_cols=unique_cols)
-#     else:
-#         print('Not success: ',exit_status[res['status']])
-#         print()
-#
