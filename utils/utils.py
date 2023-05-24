@@ -141,17 +141,32 @@ def get_select_script(market, schema, singleID, matchID, limit=True, moving_odds
         #         y=schema, z=matchID)
 
 
-def load_asian_odds(engine,MatchID,market,timestamp):
+def load_asian_odds(engine,MatchID,market,timestamp,from_csv=False):
     if market == 'ou':
-        odds = pd.read_sql(sql_ou.format(matchid=MatchID, timestamp=timestamp), engine)
+        if from_csv:
+            odds = pd.read_csv('ou_sample.csv')
+            odds= odds[odds['Timestamp'] == timestamp]
+            odds = odds[["Over","0","1"]]
+        else:
+            odds = pd.read_sql(sql_ou.format(matchid=MatchID, timestamp=timestamp), engine)
         odds = odds.loc[odds['Over'].str.contains('^\d\.[0,5]$')].reset_index(drop=True)
         return odds
     if market == 'ah':
-        odds = pd.read_sql(sql_ah.format(matchid=MatchID, timestamp=timestamp), engine)
+        if from_csv:
+            odds = pd.read_csv("ah_sample.csv")
+            odds= odds[odds['Timestamp'] == timestamp]
+            odds = odds[["Handicap","0","1"]]
+        else:
+            odds = pd.read_sql(sql_ah.format(matchid=MatchID, timestamp=timestamp), engine)
         odds = hlp.parse_handicap(odds).reset_index(drop=True)
         return odds
     if market == '1x2':
-        odds=pd.read_sql(sql_x.format(matchid=MatchID), engine)
+        if from_csv:
+            odds = pd.read_csv('1x2_sample.csv')
+            odds= odds[odds['MatchID'] == MatchID]
+            odds= odds[["x","1","2","Timestamp"]]
+        else:
+            odds=pd.read_sql(sql_x.format(matchid=MatchID), engine)
         return odds
 
 def load_data(conn, singleID=False, matchID=None, schema=None, market=None, to_numpy=False, csv=False, csv_file="",

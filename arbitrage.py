@@ -36,7 +36,7 @@ unique_cols = '","'.join(['MatchID', 'Timestamp'] + all_markets + all_bookmakers
 
 
 class Arbitrage:
-    def __init__(self, db, schemas, markets, bookmakers, min_bet=5, max_bet=1000, moving_odds=True):
+    def __init__(self, db, schemas, markets, bookmakers, min_bet=5, max_bet=1000, moving_odds=True,points=11):
         self.db = db
         self.schemas = schemas
         self.markets = markets
@@ -44,7 +44,7 @@ class Arbitrage:
         # self.timelimit = timelimit
         self.min_bet = min_bet
         self.max_bet = max_bet
-        self.points = 11
+        self.points = points
         self.moving_odds = moving_odds
         if len(self.bookmakers) == 1:
             self.table_name = 'Arbitrage_1BM'
@@ -259,6 +259,7 @@ class Arbitrage:
         N = A.shape[1]
         A = np.hstack((A, -np.ones((A.shape[0], 1))))
         model = gp.Model('LP')
+        model.setParam('LogToConsole', 0)
         x = model.addMVar(shape=N + 1, vtype=GRB.CONTINUOUS, name="x")
         y = model.addMVar(shape=N, vtype=GRB.BINARY, name="y")
 
@@ -266,7 +267,6 @@ class Arbitrage:
         model.addConstr(x[:-1] <= self.max_bet * y)
         #model.addConstr(x[-1] >= 1)
         model.addConstr(A @ x >= np.zeros(A.shape[0]), name="c")
-        if not verbose: model.setParam('LogToConsole', 0)
         model.setObjective(x[-1], GRB.MAXIMIZE)
 
         return model, A, x, y,None
@@ -279,18 +279,16 @@ class Arbitrage:
         N = A.shape[1]
         M = A.shape[0]
         model = gp.Model('LP')
+        model.setParam('LogToConsole', 0)
         x = model.addMVar(shape=N, vtype=GRB.CONTINUOUS, name="x")
         y = model.addMVar(shape=N, vtype=GRB.BINARY, name="y")
         z = model.addMVar(M,vtype=GRB.CONTINUOUS,name="z")
         model.addConstr(x >= self.min_bet*y)
         model.addConstr(x <= self.max_bet*y)
-        #chyba?
-        # 200
-        model.addConstr(z >= 10)
+        model.addConstr(z >= 0)
         model.addConstr(A@x - z >= -threshold*self.max_bet, name = 'c')
         #model.addConstr(A@x - z <= 0, name='c')
         #model.addConstr(A@x >= z, name='c')
-        if not verbose: model.setParam('LogToConsole', 0)
         weighted_sum = sum(weights[i] * z[i] for i in range(M))
         model.setObjective(weighted_sum,sense=gp.GRB.MAXIMIZE)
         return model,A,x,y,z

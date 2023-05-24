@@ -52,9 +52,12 @@ def find_one_match(asian_odds_engine, match_id):
 def find_result(home, away, res_engine, time):
     translated_home, translated_away = maping.translate(ao_name_home=home, ao_name_away=away)
     translated_time = maping.change_date(AO_date=str(time))
-    return translated_home, translated_away, pd.read_sql(
-        sql_queries.sql_results.format(h=translated_home, a=translated_away, t=translated_time),
-        con=res_engine), translated_time
+    if res_engine is None:
+        return translated_home, translated_away
+    else:
+        return translated_home, translated_away, pd.read_sql(
+            sql_queries.sql_results.format(h=translated_home, a=translated_away, t=translated_time),
+            con=res_engine), translated_time
 
 
 def calculate_mapping(match_ids=None, results_engine=None, res_engine=None):
@@ -327,32 +330,3 @@ def simple_test_real_probs(lambda_h_book, lambda_a_book, lambda_a_model, lambda_
     return result, result_basic, x[:-1], x_w
 
 
-if __name__ == '__main__':
-    ssh_tunnel = SSHTunnelForwarder(
-        ip,
-        ssh_username='syrovzde',
-        ssh_private_key='C:\\Users\\zdesi\\.ssh\\syrovzde_rsa',
-        remote_bind_address=('localhost', 5432)
-    )
-    ssh_tunnel.start()
-
-    engine = create_engine("postgresql://{user}@{host}:{port}/{db}".format(
-        host='localhost',
-        port=ssh_tunnel.local_bind_port,
-        user='syrovzde',
-        db='asianodds'
-    ))
-
-    result_engine = create_engine("postgresql://{user}@{host}:{port}/{db}".format(
-        host='localhost',
-        port=ssh_tunnel.local_bind_port,
-        user='syrovzde',
-        db='betexplorer'
-    ))
-    for threshold in np.linspace(0.01, 0.1, num=10):
-        splits = ps.load_txt(k=10)
-        profits, betting_vectors, matchids_profit = arbitrage_profit(engine=engine, res_engine=result_engine,
-                                                                     match_ids=splits, weighted=True,
-                                                                     lambda_weighted=True, threshold=threshold)
-        with open("profits_threshold_{t}.txt".format(t=threshold), 'w') as f:
-            f.write(str(profits))

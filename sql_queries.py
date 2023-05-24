@@ -3,6 +3,18 @@ sql_all_matches = """
 SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\"
 """
 
+sql_all_1x2 = """
+SELECT \"MatchID\","x\",\"1\",\"2\",\"Timestamp\" FROM asianodds.\"Odds_1x2_FT\"
+"""
+
+sql_all_ah = """
+SELECT \"MatchID\", \"Handicap\",\"1\" as \"0\" ,\"2\" as \"1\",\"Timestamp\" FROM asianodds.\"Odds_ah_FT\"
+"""
+
+sql_all_ou = """
+SELECT \"MatchID\",\"Over\",\"1\" as \"0\",\"2\" as \"1\",\"Timestamp\" FROM asianodds.\"Odds_ou_FT\"
+"""
+
 sql_all_matches_limited = """
 SELECT \"MatchID\",\"Time\",\"Home\",\"Away\",\"League\" FROM asianodds.\"Matches\"
 """

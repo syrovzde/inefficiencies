@@ -56,7 +56,3 @@ def remove_margin(odds):
     implied_probs = [inv_odd / sum(inv_odds) for inv_odd in
                      inv_odds]  # Calculate the implied probability for each outcome
     return implied_probs
-
-#print(remove_margin([1.8,3.3,6]))
-if __name__ == '__main__':
-    load_txt()
