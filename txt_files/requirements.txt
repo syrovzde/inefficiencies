@@ -1,0 +1,8 @@
+numpy~=1.22.3
+pandas~=1.4.2
+sqlalchemy~=1.4.44
+gurobipy~=9.1.1
+scipy~=1.8.1
+textdistance~=4.5.0
+sshtunnel~=0.4.0
+psycopg2~=2.8.6
