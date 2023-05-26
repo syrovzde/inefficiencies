@@ -1,13 +1,13 @@
-import sql_queries
-from arbitrage_main import find_all_completed_matches, get_lambdas
-from arbitrage_main import find_result
-from arbitrage_main import indices_threshhold
-from arbitrage_main import res_test
-from arbitrage_main import ret_profit
-import utils.utils as ut
-import arbitrage
+from sources import sql_queries
+from sources.arbitrage_main import find_all_completed_matches, get_lambdas
+from sources.arbitrage_main import find_result
+from sources.arbitrage_main import indices_threshhold
+from sources.arbitrage_main import res_test
+from sources.arbitrage_main import ret_profit
+import sources.utils.utils as ut
+from sources import arbitrage
 import pandas as pd
-from poisson import poisson
+from sources.poisson import poisson
 import os
 csv_file_with_mapping = 'csv_files'+ os.sep +'bet_AsianOdds_AO2BE.csv'
 schemas = ['asianodds']

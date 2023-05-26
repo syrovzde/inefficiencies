@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from gurobipy import GRB
 
-from utils import helper_functions as hlp
-from utils import utils
+from sources.utils import helper_functions as hlp
+from sources.utils import utils
 
 all_markets = ['1x2', 'bts', 'ou', 'ah', 'dc']
 all_bookmakers = ['10Bet', '1xBet', '888sport', 'Betfair', 'Betway', 'bwin', 'ComeOn', 'Unibet', 'William Hill',

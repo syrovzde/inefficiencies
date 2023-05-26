@@ -1,13 +1,13 @@
 import pandas as pd
-import sql_queries
-import arbitrage
-from threshhold_calculator import indices_threshhold
-from utils import utils as ut
+from sources import sql_queries
+from sources import arbitrage
+from sources.threshhold_calculator import indices_threshhold
+from sources.utils import utils as ut
 import numpy as np
-import maping
-import poisson as ps
-from poisson import poisson
-from utils import helper_functions as hlp
+from sources import maping
+from sources import poisson as ps
+from sources.poisson import poisson
+from sources.utils import helper_functions as hlp
 import os
 
 csv_file_with_mapping = 'csv_files' + os.sep +'bet_AsianOdds_AO2BE.csv'
