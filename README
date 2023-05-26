@@ -1,24 +1,18 @@
-download sources from: https://github.com/syrovzde/inefficiencies because I was unable to fit all the required files(there is 50mb limit per file as attachment) Code here is unrunnable because it does not have all of the required csv files. If it is not required for code to be run that all the python files are available for reading.
-
-
 
 All of the file sources for finding and calculating arbitrage bets
 
+There is tutorial.ipnb  notebook where program can be tested
+  - Requires Gurobi lincence, there is a CTU licence available:
+  - Here is a guide to get the licence https://cw.fel.cvut.cz/b222/_media/courses/ko/gurobi_installation_guide_2023.pdf from combinatorial course
+  - Plus all of the imported used python libraries
 
-There is tutorial.ipnb  notebook where  program can be tested
-
-Requires Gurobi lincence, there is a CTU licence available:
-
-here is a guide to get the licence https://cw.fel.cvut.cz/b222/_media/courses/ko/gurobi_installation_guide_2023.pdf from combinatorial course
-
-plus all of the imported used python libraries
 
 In terms of code majority of functions are related to the database or parsing of strings.
 The important functions are:
-arbitrage_profit in file arbitrage_main.py which is a function that takes all the parameters in the thesis and runs one concrete test and returns profits
-The program formulations are in arbitrage.py as create_model and create_weighted_model functions.
-Mapping between strings is in mapping.py
-Poisson-related functions in Poisson.py
+  - Arbitrage_profit in file arbitrage_main.py which is a function that takes all the parameters in the thesis and runs one concrete test and returns profits
+  - The program formulations are in arbitrage.py as create_model and create_weighted_model functions.
+  - Mapping between strings is in mapping.py
+  - Poisson-related functions in Poisson.py
 
 Only tutorial.ipnb and shown example can be run(parameters of function arbitrage_profit_tutorial can still be changed with the exception of points=11)
 The test is run on a few matchids that were chosen from ones that yield some results.
